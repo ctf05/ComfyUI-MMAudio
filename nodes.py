@@ -80,16 +80,6 @@ def process_video_tensor(video_tensor: torch.Tensor, duration_sec: float) -> tup
     clip_length_sec = clip_frames.shape[0] / _CLIP_FPS
     sync_length_sec = sync_frames.shape[0] / _SYNC_FPS
 
-    # if clip_length_sec < duration_sec:
-    #     log.warning(f'Clip video is too short: {clip_length_sec:.2f} < {duration_sec:.2f}')
-    #     log.warning(f'Truncating to {clip_length_sec:.2f} sec')
-    #     duration_sec = clip_length_sec
-
-    # if sync_length_sec < duration_sec:
-    #     log.warning(f'Sync video is too short: {sync_length_sec:.2f} < {duration_sec:.2f}')
-    #     log.warning(f'Truncating to {sync_length_sec:.2f} sec')
-    #     duration_sec = sync_length_sec
-
     clip_frames = clip_frames[:int(_CLIP_FPS * duration_sec)]
     sync_frames = sync_frames[:int(_SYNC_FPS * duration_sec)]
 
@@ -113,17 +103,15 @@ class MMAudioModelLoader:
     CATEGORY = "MMAudio"
 
     def loadmodel(self, mmaudio_model, base_precision):
-       
-
-        device = mm.get_torch_device()
+        device = "cpu"  # Changed to load on CPU initially
         offload_device = mm.unet_offload_device()
-       
+
         mm.soft_empty_cache()
 
         base_dtype = {"fp8_e4m3fn": torch.float8_e4m3fn, "fp8_e4m3fn_fast": torch.float8_e4m3fn, "bf16": torch.bfloat16, "fp16": torch.float16, "fp32": torch.float32}[base_precision]
 
         mmaudio_model_path = folder_paths.get_full_path_or_raise("mmaudio", mmaudio_model)
-        mmaudio_sd = load_torch_file(mmaudio_model_path, device=offload_device)
+        mmaudio_sd = load_torch_file(mmaudio_model_path, device=device)
 
         if "small" in mmaudio_model:
             num_heads = 7
@@ -268,9 +256,6 @@ class MMAudioFeatureUtilsLoader:
             set_module_tensor_to_device(clip_model, name, device=device, dtype=dtype, value=clip_sd[name])
         clip_model.to(device=device, dtype=dtype)
 
-        #clip_model = create_model_from_pretrained("hf-hub:apple/DFN5B-CLIP-ViT-H-14-384", return_transform=False)
-        
-       
         feature_utils = FeaturesUtils(vae=vae,
                                   synchformer=synchformer,
                                   enable_conditions=True,
@@ -344,7 +329,6 @@ class MMAudioSampler:
             feature_utils.to(offload_device)
             mm.soft_empty_cache()
         waveform = audios.float().cpu()
-        #torchaudio.save("test.wav", waveform, 44100)
         audio = {
             "waveform": waveform,
             "sample_rate": 44100
