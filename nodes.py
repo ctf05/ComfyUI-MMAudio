@@ -103,7 +103,7 @@ class MMAudioModelLoader:
     CATEGORY = "MMAudio"
 
     def loadmodel(self, mmaudio_model, base_precision):
-        device = "cpu"  # Changed to load on CPU initially
+        device = torch.device("cpu")   # Changed to load on CPU initially
         offload_device = mm.unet_offload_device()
 
         mm.soft_empty_cache()
@@ -174,7 +174,7 @@ class MMAudioVoCoderLoader:
         vocoder_model_path = folder_paths.get_full_path_or_raise("mmaudio", vocoder_model)
         vocoder_model = BigVGAN.from_pretrained(vocoder_model_path).eval()
         return (vocoder_model_path,)
-        
+
 class MMAudioFeatureUtilsLoader:
     @classmethod
     def INPUT_TYPES(s):
@@ -199,15 +199,15 @@ class MMAudioFeatureUtilsLoader:
     CATEGORY = "MMAudio"
 
     def loadmodel(self, vae_model, precision, synchformer_model, clip_model, mode, bigvgan_vocoder_model=None):
-        
-        device = mm.get_torch_device()
+
+        device = torch.device("cpu")  # Load everything to CPU initially
         offload_device = mm.unet_offload_device()
 
         dtype = {"bf16": torch.bfloat16, "fp16": torch.float16, "fp32": torch.float32}[precision]
 
         #synchformer
         synchformer_path = folder_paths.get_full_path_or_raise("mmaudio", synchformer_model)
-        synchformer_sd = load_torch_file(synchformer_path, device=offload_device)
+        synchformer_sd = load_torch_file(synchformer_path, device=device)
         synchformer = Synchformer()
         synchformer.load_state_dict(synchformer_sd)
         synchformer = synchformer.eval().to(device=device, dtype=dtype)
@@ -234,7 +234,7 @@ class MMAudioFeatureUtilsLoader:
             bigvgan_vocoder = bigvgan_vocoder_model
         
         vae_path = folder_paths.get_full_path_or_raise("mmaudio", vae_model)
-        vae_sd = load_torch_file(vae_path, device=offload_device)
+        vae_sd = load_torch_file(vae_path, device=device)
         vae = AutoEncoderModule(
             vae_state_dict=vae_sd,
             bigvgan_vocoder=bigvgan_vocoder,
@@ -251,7 +251,7 @@ class MMAudioFeatureUtilsLoader:
             
         with init_empty_weights():
             clip_model = CLIP(**clip_config["model_cfg"]).eval()
-        clip_sd = load_torch_file(os.path.join(clip_model_path), device=offload_device)
+        clip_sd = load_torch_file(os.path.join(clip_model_path), device=device)
         for name, param in clip_model.named_parameters():
             set_module_tensor_to_device(clip_model, name, device=device, dtype=dtype, value=clip_sd[name])
         clip_model.to(device=device, dtype=dtype)
